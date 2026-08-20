@@ -1,21 +1,19 @@
 # Markdown that is consumed by tooling rather than published to the docs site.
-# A top-level heading would change their meaning, so MD041 must not apply to them.
+# Markdown that is consumed by AI-Agents does need to follow appropriate rules
+# Some folders are set to be ignored as we rollout fixes
 
-# Workflow templates
+# Workflow templates - a top-level heading would change their meaning, so MD041 must not apply to them.
 .github/ISSUE_TEMPLATE/
 .github/pull_request_template.md
-
-# Markdown that is consumed by AI-Agents does need to follow standards
-# Some folders are set to be ignored as we rollout fixes
 
 # Superpowers & designs (for now)
 docs/superpowers
 docs/design
 
-# Ignore Claude Code agent definitions as it just refers to AGENTS.md
+# CLAUDE.md is just an @-include pointing at AGENTS.md, so it fails MD041 (no H1)
 CLAUDE.md
 
-# Ignore skills files (for now)
+# Ignore Claude skills files (for now)
 .claude/skills/
 .claude/skills/extract-adrs/templates
 
