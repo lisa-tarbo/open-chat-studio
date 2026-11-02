@@ -7,13 +7,13 @@ For prose style, follow the [Writing style](https://github.com/dimagi/open-chat-
 ## Audience and scope
 
 - [ ] **The opening paragraph says what the page covers and who it is for.** A reader should know within two sentences whether they are in the right place.
-- [ ] **Content owned elsewhere is linked, not restated.** This covers workflow header comments, READMEs, `AGENTS.md`, other guides and user docs. Restated content drifts.
-- [ ] **Features with user-facing docs link to them.** Say which page covers the user's view and which covers the implementation.
+- [ ] **Content owned elsewhere is linked, not restated.** This covers workflow header comments, READMEs, `AGENTS.md`, other guides and user docs. For a feature with user-facing docs, link to them and say which page covers the user's view and which covers the implementation. Restated content drifts.
 
 ## Accuracy
 
-- [ ] **Every command, path, setting, flag and symbol was checked against source.** The PR description says what was checked and how.
+- [ ] **Technical claims are listed for an engineer to confirm.** The writer lists the commands, paths, settings and versions they could not verify. A style review does not check them against source.
 - [ ] **The page avoids values that drift.** Counts, versions and line numbers go stale. When one is needed, name its source of truth.
+- [ ] **A fact stated in more than one place says the same thing everywhere.** Versions, requirements and command names must agree within the page and across linked pages.
 - [ ] **The page describes current behaviour only.** No "this PR", "now", "no longer" or "previously". Limitations and planned work go in a labelled section with an issue link.
 
 ## Content
@@ -22,12 +22,12 @@ For prose style, follow the [Writing style](https://github.com/dimagi/open-chat-
 - [ ] **Procedures are numbered, one action per step.** Where a failure is silent, the step says how to verify the result.
 - [ ] **Warnings come before the step they apply to.** A warning after the step is read too late.
 - [ ] **Setup and how-to guides include troubleshooting for known failures.** List symptoms and the fix.
-- [ ] **Examples are minimal and match the current codebase.** Show an incorrect example only for a mistake readers are likely to make.
+- [ ] **Examples are minimal.** Show an incorrect example only for a mistake readers are likely to make.
 
 ## Voice and tone
 
 - [ ] **Steps are imperative and the reader is "you".** Describe system behaviour with "OCS" or the named component, not "we" ("OCS verifies the signature"). "We" is ambiguous for external contributors and self-hosters.
-- [ ] **UI labels are bold and match the UI exactly. Code identifiers are in backticks.** If the page uses both the product name "Chatbot" and the code name `Experiment`, say so once.
+- [ ] **UI labels are bold and match the UI exactly. Code identifiers are in backticks.**
 
 ## Formatting
 
