@@ -124,6 +124,7 @@ Consult these guides when working in the relevant area:
 * `docs/agents/pipeline_node_types.md` — when writing code that branches on a pipeline node's type
 * `docs/agents/pipeline_repository.md` — when adding or modifying DB access in pipeline nodes
 * `docs/agents/ui_components.md` — when adding UI to templates (confirmation dialogs, notifications)
+* `docs/contributing/docs_review_checklist.md` — when writing or reviewing a page under `docs/developer_guides/`
 * `docs/developer_guides/code_systems/feature_flags.md` — when adding, using, or removing feature flags
 * `docs/developer_guides/feature_deprecation.md` — when deprecating or removing a feature
 * `docs/developer_guides/testing/help_agent_evals.md` — when adding or modifying help agents or their eval tests
