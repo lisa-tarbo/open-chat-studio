@@ -1,37 +1,62 @@
 # Collection Retrieval
 
-Retrieval is how an indexed collection turns a natural-language query into the handful of file
-chunks a chatbot puts in front of its LLM. Contextual retrieval has its own feature flag; hybrid
-search and reranking share another. Both are off by default, so a deployment that enables neither
-behaves exactly as OCS did before any of this existed.
+Retrieval is how an indexed collection turns a natural-language query into the few file chunks
+(`top_k`) a chatbot gives its LLM as context. At query time, the system scores each chunk against
+the query and returns the best matches.
 
-`apps.documents.retrieval.search_collection` is the single entry point. Both callers go through
-it — the chat search tools (`SearchIndexTool`, `SearchCollectionByIdTool` in
-`apps/chat/agent/tools.py`) and the collection query preview in `apps/documents/views.py` — so
-"what retrieval means" is defined once.
+Dense retrieval (called dense search in the code and in the rest of this page) always runs. It
+converts the query and each chunk to embedding vectors and returns the chunks nearest the query.
 
-This page covers the local index path (`Collection.is_remote_index=False`). Remote indexes
-delegate storage and search to the provider's vector store, so none of these stages apply to
+Three optional stages build on it:
+
+- **[Contextual retrieval](#indexing-contextual-retrieval)** adds a short context header to each
+  chunk before it is embedded, at indexing time.
+- **[Hybrid search](#hybrid-search-dense-and-lexical-fused)** adds a keyword (lexical) search and fuses
+  its ranking with the dense one, at query time.
+- **[Reranking](#reranking)** rescores the candidates against the query, at query time.
+
+This page covers local indexes only (`Collection.is_remote_index=False`). Remote indexes
+delegate storage and search to the provider's vector store, so none of the stages below apply to
 them; see [Index Managers](index_managers.md).
 
-## The pipeline
+## Overview
+
+### The pipeline
 
 ```text
-query ──► dense (pgvector)   ─┐
-                              ├─► RRF fusion ──► rerank ──► top_k chunks
-      ──► lexical (Postgres FTS) ─┘
+Indexing:  chunk ─► [add context header] ─► embed ─► store
+
+Query:     query ─┬─► dense search (pgvector) ────────────────┐
+                  │                                           ├─► [RRF fusion] ─► [rerank] ─► top_k chunks
+                  └─► [lexical search (Postgres full-text)] ──┘
 ```
 
-| Stage | Flag | Where |
-| --- | --- | --- |
-| Contextual chunk headers (indexing time) | `flag_contextual_retrieval` | `apps/service_providers/llm_service/contextualizer.py` |
-| Lexical search and RRF fusion | `flag_hybrid_search` | `apps/documents/retrieval.py` |
-| Reranking | `flag_hybrid_search` plus provider/model configuration | `apps/documents/rerankers.py` |
+Brackets mark optional stages, which are behind a feature flag. Terms used above:
 
-Both are team-aware waffle flags (see [Feature Flags](../feature_flags.md)), so they can be
-enabled per team, by percentage, or globally, and rolled back without a deploy.
+- **RRF (Reciprocal Rank Fusion)** merges the dense and lexical rankings using each chunk's rank
+  position in each, not its score.
+- **pgvector** is the PostgreSQL extension that stores embeddings and runs the vector search.
+- **Postgres full-text search** is PostgreSQL's built-in keyword search, used for lexical search.
 
-### Indexing: contextual chunk headers
+| Stage | When | Feature flag | Where |
+| --- | --- | --- | --- |
+| Dense search | Indexing (embed) and query (search) | None, always on | `apps/documents/retrieval.py` |
+| Contextual retrieval | Indexing | `flag_contextual_retrieval` | `apps/service_providers/llm_service/contextualizer.py` |
+| Hybrid search | Query | `flag_hybrid_search` | `apps/documents/retrieval.py` |
+| Reranking | Query | `flag_hybrid_search` plus a reranker provider | `apps/documents/rerankers.py` |
+
+Both flags are off by default, so with neither enabled only dense search runs.
+
+The flags are Waffle feature flags (see [Feature Flags](../feature_flags.md)). Each can be enabled
+per team, by percentage, or globally, and rolled back without a deploy.
+
+### Entry point
+
+`apps.documents.retrieval.search_collection` is the single entry point for retrieval. It is called
+by the chat search tools (`SearchIndexTool`, `SearchCollectionByIdTool` in
+`apps/chat/agent/tools.py`) and by the collection query preview in `apps/documents/views.py`.
+
+## Indexing: contextual retrieval
 
 A chunk embedded in isolation carries no signal about which document it came from — "revenue grew
 3% over the previous quarter" does not say whose revenue or which quarter. When contextual
@@ -44,7 +69,7 @@ The document is placed in the system prompt so provider prompt caching can reuse
 chunk of the same file. A failed contextualizer call logs and returns an empty header, so a file
 still indexes.
 
-### Retrieval: dense and lexical, fused
+## Hybrid search: dense and lexical, fused
 
 Dense search is the original behaviour: cosine distance between the query embedding and each
 chunk's `embedding`, over the HNSW index.
@@ -68,7 +93,7 @@ only one of the two simply gets no contribution from the other; no imputation is
 
 `Collection.search_fetch_k` (40) is how many candidates each side contributes to the fusion.
 
-### Reranking
+## Reranking
 
 Neither dense nor lexical search ever looks at a query and a chunk together: an embedding is
 computed before the query exists, and `ts_rank_cd` only counts term overlap. A reranker scores
@@ -80,8 +105,8 @@ When reranking is active, `search_collection` widens its candidate pool to
 best `top_k`. Reranked chunks carry a `rerank_score`.
 
 Only a hosted reranker is implemented, backed by Voyage AI. Voyage rather than another provider
-because OCS already ships the `voyageai` client (a dependency of `langchain-voyageai`, used for
-Voyage embeddings) and already models Voyage credentials as an `LlmProvider`, so reranking adds
+because OCS already depends on the `voyageai` client (used for Voyage embeddings through
+`langchain-voyageai`) and already models Voyage credentials as an `LlmProvider`, so reranking adds
 no third-party dependency and no new provider type. A local cross-encoder and Cohere are both
 left as follow-ups, since each would add one.
 
@@ -94,7 +119,7 @@ ranking it already had, logs, and returns that. `Collection.get_reranker()` like
 must be active and both `reranker_provider` and `rerank_model` must be present. It answers from the
 loaded collection instance without fetching the provider row.
 
-#### Context conditioning
+### Context conditioning
 
 `search_collection` accepts an optional `context` — the recent conversation turns, which
 LangGraph injects into the chat search tools as part of the graph state. It is prepended to the
