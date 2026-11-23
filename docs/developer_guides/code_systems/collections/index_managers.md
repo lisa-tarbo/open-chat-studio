@@ -84,7 +84,7 @@ exists = index_manager.file_exists_at_remote(file)
 index_manager.delete_remote_index()
 ```
 
-### Local Index Operations
+### Embedding and Chunking (Local Indexes)
 
 `get_embedding_vector` requires an `input_type` of `"document"` or `"query"`.
  - For Voyage and Google embedding providers, this routes to different underlying calls (`embed_documents` vs `embed_query`), which return different vectors — labelling each side correctly is what makes retrieval work as well as the provider can deliver.
@@ -97,11 +97,19 @@ query_vector = index_manager.get_embedding_vector(query, input_type="query")
 
 # Embed each document chunk during indexing
 file = File.objects.get(id=file_id)
-chunks = index_manager.chunk_file(file, chunk_size=500, chunk_overlap=50)
+chunks = index_manager.chunk_file(file.read_content(), chunk_size=500, chunk_overlap=50)
 for chunk in chunks:
     embedding = index_manager.get_embedding_vector(chunk, input_type="document")
     # Store in FileChunkEmbedding model...
 ```
+#### Voyage AI constraints
+
+`VoyageAILocalIndexManager` differs from the OpenAI and Google managers in these ways:
+
+- **Contextual models are rejected.** A model name containing `"context"` raises `ValueError`. Those models use Voyage's `contextualized_embed` API, which can return several embeddings for one input. The index manager stores one vector per chunk, so the extra embeddings would be dropped and the end of the chunk would be missing from the index. The check is a substring match on the model name, the same one `langchain-voyageai` uses internally.
+- **Empty strings are rejected.** `get_embedding_vector` and `get_embedding_vectors` raise `ValueError("Cannot embed empty string")`. The check happens before any API call, unlike OpenAI and Google, which fail at the API.
+- **The vector size is fixed.** Voyage is called with `output_dimension=settings.EMBEDDING_VECTOR_SIZE` (1024), so vectors fit the fixed-size embedding column. OpenAI and Google are configured the same way.
+- **The provider is also a reranker.** `VoyageAILlmService.get_reranker` returns a `VoyageReranker`. See [Collection Retrieval](collection_retrieval.md) for reranking.
 
 ### Collection Integration
 
